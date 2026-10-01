@@ -200,8 +200,9 @@ async function runHTTP(server: McpServer, port: number): Promise<void> {
     res.json({ status: "ok", server: "sophos-central-mcp-server" });
   });
 
-  app.listen(port, "127.0.0.1", () => {
-    console.error(`[sophos-mcp] HTTP server listening on http://127.0.0.1:${port}/mcp`);
+  const host = process.env.HOST ?? "127.0.0.1";
+  app.listen(port, host, () => {
+    console.error(`[sophos-mcp] HTTP server listening on http://${host}:${port}/mcp`);
   });
 }
 
