@@ -23,6 +23,7 @@ import { SophosClient } from "./client/sophos-client.js";
 import { FusionClient } from "./client/fusion-client.js";
 import { CaseReferenceDataCache } from "./fusion/case-reference-data.js";
 import { FusionMigrationGuard } from "./fusion/migration.js";
+import { applySafetyGating, isReadonlyMode } from "./safety.js";
 
 // Tool registration modules
 import { registerTenantTools } from "./tools/tenants.js";
@@ -87,6 +88,21 @@ async function main(): Promise<void> {
     name: "sophos-central-mcp-server",
     version: pkgVersion,
   });
+
+  // Gate registration before any register*Tools(...) call below: this
+  // wraps server.registerTool so every tool gets classified (read/write/
+  // destructive) and a disallowed tool is never registered at all, not
+  // just hinted. See src/safety.ts for the SOPHOS_MCP_READONLY and
+  // SOPHOS_MCP_ALLOW_DESTRUCTIVE env vars this responds to. Defaults are
+  // safe: writes are on but destructive tools (deletes, endpoint
+  // isolation, Live Discover execution, mobile wipe, message clawback,
+  // ...) are suppressed unless explicitly armed.
+  applySafetyGating(server);
+  if (isReadonlyMode()) {
+    console.error("[sophos-mcp] SOPHOS_MCP_READONLY is set: only read tools will be registered.");
+  } else if (!process.env.SOPHOS_MCP_ALLOW_DESTRUCTIVE) {
+    console.error("[sophos-mcp] Destructive tools are suppressed by default. Set SOPHOS_MCP_ALLOW_DESTRUCTIVE to arm them.");
+  }
 
   // Register tools based on identity type
   console.error(`[sophos-mcp] Registering tools for ${identity.idType} caller...`);
